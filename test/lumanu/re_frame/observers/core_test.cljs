@@ -40,17 +40,25 @@
     (is (= 1 @test-sub))))
 
 (deftest with-observers-test
+  (re-frame/reg-sub-raw
+    :a-sub
+    (fn [db [_]] (ratom/reaction (:a @db))))
+
   (let [ran-comp      (r/atom 0)
         ran-observer  (r/atom 0)
         really-simple (fn []
-                        (swap! ran-comp inc)
-                        [:div "div in really-simple"])]
+                        (let [a (subs/subscribe [:a-sub])]
+                          (swap! ran-comp inc)
+                          [:div (str "div in really-simple " @a)]))]
     (with-mounted-component [really-simple nil nil]
                             (fn [c div]
                               (swap! ran-comp inc)
                               (is (found-in #"div in really-simple" div))
                               (r/flush)
                               (is (= 2 @ran-comp))
+                              (is (nil? (:a @db/app-db)))
+                              (reset! db/app-db {:a 1})
+                              (is (= 1 (:a @db/app-db)))
                               (r/flush)
-                              (is (= 2 @ran-comp))))
-    (is (= 2 @ran-comp))))
+                              (is (= 3 @ran-comp))))
+    (is (= 3 @ran-comp))))
